@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Data Sources</title>
+</head>
+<body>
+  <h1>Data Sources</h1>
+  <form action="/datasources" method="POST">
+    <label for="name">Name:</label>
+    <input type="text" name="name" placeholder="My Data Source" required>
+    <br>
+
+    <label for="source_type">Source Type:</label>
+    <input type="text" name="source_type" placeholder="RSS, API, etc." required>
+    <br>
+
+    <label for="best_for">Best For:</label>
+    <input type="text" name="best_for" placeholder="IT support, QA jobs, etc.">
+    <br>
+
+    <label for="source_url">Source URL:</label>
+    <input type="url" name="source_url" placeholder="https://example.com/feed.rss">
+    <br>
+
+    <button type="submit">Add Data Source</button>
+  </form>
+
+  <hr>
+
+  <h2>Existing Data Sources</h2>
+  <ul>
+    {% for ds in data_sources %}
+      <li>
+        <strong>ID:</strong> {{ ds.id }}<br>
+        <strong>Name:</strong> {{ ds.name }}<br>
+        <strong>Type:</strong> {{ ds.source_type }}<br>
+        <strong>Best For:</strong> {{ ds.best_for }}<br>
+        <strong>URL:</strong> {% if ds.source_url %}<a href="{{ ds.source_url }}" target="_blank">{{ ds.source_url }}</a>{% else %}N/A{% endif %}<br>
+        <strong>Last Updated:</strong> {{ ds.last_updated }}<br>
+      </li>
+      <hr>
+    {% endfor %}
+  </ul>
+
+  <p><a href="/">Back to Home</a> | <a href="/savedsearches">Saved Searches</a></p>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Saved Searches</title>
+</head>
+<body>
+  <h1>Saved Searches</h1>
+  
+  <!-- New Search -->
+  <!-- TODO: don't clear the table when you delete an entry from Saved Searches table -->
+  <form method="POST" action="/savedsearches">
+    <label for="name">Search Name:</label>
+    <input type="text" id="name" name="name" placeholder="My Search">
+    <br>
+    <label for="keywords">Keywords:</label>
+    <input type="text" id="keywords" name="keywords" placeholder="python developer">
+    <br>
+    <label for="location">Location:</label>
+    <input type="text" id="location" name="location" placeholder="remote">
+    <br>
+    <label for="data_source_id">Data Source:</label>
+    <!-- TODO: Make data sources a multi select field -->
+    <select name="data_source_id" id="data_source_id">
+      <option value="" disabled selected>Select Data Source</option>
+      {% for ds in data_sources %}
+        <option value="{{ ds.id }}">{{ ds.name }} ({{ ds.source_type }})</option>
+      {% endfor %}
+    </select>
+    <br>
+    <label for="is_active">Is Active?</label>
+    <select name="is_active" id="is_active">
+      <option value="1">Yes</option>
+      <option value="0">No</option>
+    </select>
+    <br>
+    <button type="submit">Create Saved Search</button>
+  </form>
+
+  <hr>
+
+  <ul>
+  {% for search in searches %}
+    <li>
+      <strong>{{ search.name }}</strong>
+      [Keywords: {{ search.keywords }}]
+      [Location: {{ search.location }}]
+      [Data Source: {{ search.data_source_name }} ({{ search.data_source_type }})]
+      [Active: {{ search.is_active }}]
+
+      <!-- Delete button -->
+      <form method="POST" action="/savedsearches/{{ search.id }}/delete" style="display:inline;">
+        <button type="submit">Delete</button>
+      </form>
+
+      <!-- Run button -->
+      <form method="POST" action="/savedsearches/{{ search.id }}/run" style="display:inline;">
+        <button type="submit">Run</button>
+      </form>
+
+      <!-- Editing in a <details> to expand/collapse -->
+      <details>
+        <summary>Edit Search</summary>
+        <form method="POST" action="/savedsearches/{{ search.id }}/edit">
+          <label>Name:</label>
+          <input type="text" name="name" value="{{ search.name }}">
+          <br>
+          <label>Keywords:</label>
+          <input type="text" name="keywords" value="{{ search.keywords }}">
+          <br>
+          <label>Location:</label>
+          <input type="text" name="location" value="{{ search.location }}">
+          <br>
+          <label>Data Source:</label>
+          <select name="data_source_id">
+            <option value="" disabled>Select Data Source</option>
+            {% for ds in data_sources %}
+              <option value="{{ ds.id }}"
+                {% if ds.id == search.data_source_id %}selected{% endif %}>
+                {{ ds.name }} ({{ ds.source_type }})
+              </option>
+            {% endfor %}
+          </select>
+          <br>
+          <label>Is Active?</label>
+          <select name="is_active">
+            <option value="1" {% if search.is_active %}selected{% endif %}>Yes</option>
+            <option value="0" {% if not search.is_active %}selected{% endif %}>No</option>
+          </select>
+          <br>
+          <button type="submit">Update</button>
+        </form>
+      </details>
+    </li>
+  {% endfor %}
+  </ul>
+
+  <p><a href="/">Back to Home</a> | <a href="/datasources">Manage Data Sources</a></p>
+</body>
+</html>

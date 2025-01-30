@@ -1,24 +1,179 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Job Tracker</title>
-  </head>
-  <body>
-    <h1>Job Tracker</h1>
-    <p>Welcome to the Job Tracker app. Here are the most recent jobs:</p>
-    <table border="1">
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Job Tracker - Home</title>
+  <script>
+    // On page load, fetch saved searches and populate the multi-select.
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadSavedSearches();
+      attachEventHandlers();
+    });
+
+    async function loadSavedSearches() {
+  try {
+    const response = await fetch('/api/savedsearches');
+    const searches = await response.json();
+
+    const selectEl = document.getElementById('searchSelect');
+    searches.forEach(s => {
+      const option = document.createElement('option');
+      option.value = s.id;
+      // Parentheses around keywords ensure they match the regex
+      option.text = `${s.name} (${s.keywords || ''})`;
+      selectEl.appendChild(option);
+    });
+  } catch (err) {
+    console.error('Error loading saved searches:', err);
+  }
+}
+
+    function attachEventHandlers() {
+      // Trigger whenever the user changes multi-select.
+      document.getElementById('searchSelect')
+        .addEventListener('change', handleSearchSelection);
+
+      // Trigger the fetch of aggregated jobs when user clicks "Show Jobs."
+      document.getElementById('showJobsBtn')
+        .addEventListener('click', handleShowJobs);
+
+      // Clear table button
+      document.getElementById('clearTableBtn')
+        .addEventListener('click', clearTable);
+    }
+
+    function handleSearchSelection() {
+      // Show combined keywords. We'll simply read each selected search's name and keywords from the option text as a demo.
+      const selectEl = document.getElementById('searchSelect');
+      const outputEl = document.getElementById('selectedKeywords');
+      outputEl.innerHTML = '';
+
+      // Flatten the keywords from selected options
+      const selectedKeywords = [];
+      for (let i = 0; i < selectEl.selectedOptions.length; i++) {
+        const text = selectEl.selectedOptions[i].text; 
+        // text looks like "My Search (python dev java)"
+        // We'll parse out parentheses for demonstration
+        const match = text.match(/\\(([^)]*)\\)$/);
+        if (match && match[1]) {
+          const words = match[1].split(' ');
+          selectedKeywords.push(...words);
+        }
+      }
+
+      if (selectedKeywords.length === 0) {
+        outputEl.textContent = '(No keywords selected.)';
+        return;
+      }
+      const unique = Array.from(new Set(selectedKeywords)); // deduplicate
+      outputEl.textContent = 'Keywords: ' + unique.join(', ');
+    }
+
+    async function handleShowJobs() {
+      // Send selected search IDs to /api/jobs_for_searches.
+      const selectEl = document.getElementById('searchSelect');
+      const searchIds = [];
+      for (let i = 0; i < selectEl.selectedOptions.length; i++) {
+        searchIds.push(parseInt(selectEl.selectedOptions[i].value, 10));
+      }
+      if (searchIds.length === 0) {
+        alert('No searches selected.');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/jobs_for_searches', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({search_ids: searchIds})
+        });
+        const jobs = await response.json();
+        populateJobsTable(jobs);
+      } catch (error) {
+        console.error('Error fetching jobs:', error);
+      }
+    }
+
+    function populateJobsTable(jobs) {
+      const tableBody = document.getElementById('jobsTableBody');
+      // Clear existing rows
+      tableBody.innerHTML = '';
+
+      jobs.forEach(job => {
+        const row = document.createElement('tr');
+
+        // We'll just show a few fields
+        const tdTitle = document.createElement('td');
+        tdTitle.textContent = job.title;
+        row.appendChild(tdTitle);
+
+        const tdCompany = document.createElement('td');
+        tdCompany.textContent = job.company;
+        row.appendChild(tdCompany);
+
+        const tdLocation = document.createElement('td');
+        tdLocation.textContent = job.location || 'N/A';
+        row.appendChild(tdLocation);
+
+        const tdWorkStatus = document.createElement('td');
+        tdWorkStatus.textContent = job.work_status || 'N/A';
+        row.appendChild(tdWorkStatus);
+
+        const tdLink = document.createElement('td');
+        const a = document.createElement('a');
+        a.href = job.url;
+        a.target = '_blank';
+        a.textContent = 'View Job';
+        tdLink.appendChild(a);
+        row.appendChild(tdLink);
+
+        tableBody.appendChild(row);
+      });
+    }
+
+    function clearTable() {
+      document.getElementById('jobsTableBody').innerHTML = '';
+    }
+  </script>
+</head>
+<body>
+  <h1>Job Tracker - Home</h1>
+
+  <h2>Multi-Select Saved Searches</h2>
+  <p>
+    <a href="{{ url_for('show_saved_searches') }}">
+      Manage Saved Searches
+    </a>
+  </p>
+  <p>
+    <a href="{{ url_for('manage_data_sources') }}">
+      Manage Data Sources
+    </a>
+  </p>
+  <select id="searchSelect" multiple style="width: 300px; height: 100px;">
+    <!-- Options dynamically loaded -->
+  </select>
+
+  <p id="selectedKeywords">(No keywords selected.)</p>
+  <button id="showJobsBtn">Show Jobs</button>
+  <button id="clearTableBtn">Clear Table</button>
+
+  <hr>
+
+  <h2>Combined Jobs</h2>
+  <table border="1">
+    <thead>
       <tr>
         <th>Title</th>
         <th>Company</th>
-        <th>URL</th>
+        <th>Location</th>
+        <th>Work Status</th>
+        <th>Link</th>
       </tr>
-      {% for job in jobs %}
-      <tr>
-        <td>{{ job.title }}</td>
-        <td>{{ job.company }}</td>
-        <td><a href="{{ job.url }}" target="_blank">View</a></td>
-      </tr>
-      {% endfor %}
-    </table>
-  </body>
+    </thead>
+    <tbody id="jobsTableBody">
+      <!-- Rows populated dynamically via JS -->
+    </tbody>
+  </table>
+</body>
 </html>
