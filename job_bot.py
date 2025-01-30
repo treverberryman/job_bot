@@ -117,6 +117,7 @@ class JobTracker:
     def init_db(self):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
+            # Jobs Table
             c.execute("""CREATE TABLE IF NOT EXISTS jobs (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
                             title TEXT,
@@ -126,6 +127,15 @@ class JobTracker:
                             date_posted TEXT,
                             source TEXT,
                             date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )""")
+            # Saved Searches Table
+            c.execute("""CREATE TABLE IF NOT EXISTS searches (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name TEXT,
+                            keywords TEXT,
+                            location TEXT,
+                            is_active INTEGER DEFAULT 1,
+                            date_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         )""")
             conn.commit()
 
@@ -177,6 +187,88 @@ class JobTracker:
             })
         return jobs_list
 
+# ========================
+# CRUD for Saved searches
+# ========================
+
+def add_search(self, name, keywords, location, is_active=1):
+        with sqlite3.connect(self.db_name) as conn:
+            c = conn.cursor()
+            c.execute("""INSERT INTO searches (name, keywords, location, is_active)
+                         VALUES (?, ?, ?, ?)""",
+                      (name, keywords, location, is_active))
+            conn.commit()
+            return c.lastrowid
+
+def get_searches(self):
+    with sqlite3.connect(self.db_name) as conn:
+        c = conn.cursor()
+        c.execute("SELECT id, name, keywords, location, is_active, date_created FROM searches")
+        rows = c.fetchall()
+        searches = []
+        for row in rows:
+            searches.append({
+                'id': row[0],
+                'name': row[1],
+                'keywords': row[2],
+                'location': row[3],
+                'is_active': bool(row[4]),
+                'date_created': row[5]
+            })
+        return searches
+
+def get_search_by_id(self, search_id):
+    with sqlite3.connect(self.db_name) as conn:
+        c = conn.cursor()
+        c.execute("SELECT id, name, keywords, location, is_active, date_created FROM searches WHERE id = ?", (search_id,))
+        row = c.fetchone()
+        if not row:
+            return None
+        return {
+            'id': row[0],
+            'name': row[1],
+            'keywords': row[2],
+            'location': row[3],
+            'is_active': bool(row[4]),
+            'date_created': row[5]
+        }
+
+def update_search(self, search_id, name=None, keywords=None, location=None, is_active=None):
+    with sqlite3.connect(self.db_name) as conn:
+        c = conn.cursor()
+
+        # We build a dynamic query
+        updates = []
+        params = []
+        if name is not None:
+            updates.append("name = ?")
+            params.append(name)
+        if keywords is not None:
+            updates.append("keywords = ?")
+            params.append(keywords)
+        if location is not None:
+            updates.append("location = ?")
+            params.append(location)
+        if is_active is not None:
+            updates.append("is_active = ?")
+            params.append(1 if is_active else 0)
+
+        if not updates:
+            return 0  # Nothing to update
+
+        query = "UPDATE searches SET " + ", ".join(updates) + " WHERE id = ?"
+        params.append(search_id)
+        c.execute(query, tuple(params))
+        conn.commit()
+        return c.rowcount
+
+def delete_search(self, search_id):
+    with sqlite3.connect(self.db_name) as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM searches WHERE id = ?", (search_id,))
+        conn.commit()
+        return c.rowcount
+
 # Instantiate global objects
 job_search_tester = JobSearchTester()
 tracker = JobTracker()
@@ -184,7 +276,13 @@ tracker = JobTracker()
 # Flask Routes
 @app.route('/')
 def home():
-    return "<h1>Job Tracker</h1><p>Welcome to the Job Tracker app.</p>"
+    jobs = tracker.get_jobs()
+    html = "<h1>Job Tracker</h1><p>Welcome to the Job Tracker app.</p>"
+    html += "<h2>Current Jobs:</h2><ul>"
+    for job in jobs:
+        html += f"<li>{job['title']} at {job['company']} - <a href='{job['url']}' target='_blank'>View</a></li>"
+    html += "</ul>"
+    return html
 
 @app.route('/search', methods=['POST'])
 def search_jobs():
@@ -217,6 +315,80 @@ def list_jobs():
 @app.route('/test')
 def test_endpoint():
     return "This is a test endpoint."
+
+# ===========================================
+# New endpoints for managing Saved Searches
+# ===========================================
+@app.route('/savedsearches', methods=['GET'])
+def get_saved_searches():
+    all_searches = tracker.get_searches()
+    return jsonify(all_searches)
+
+@app.route('/savedsearches', methods=['POST'])
+def create_saved_search():
+    name = request.form.get('name', 'My Search')
+    keywords = request.form.get('keywords', '')
+    location = request.form.get('location', '')
+    is_active = request.form.get('is_active', '1')  # '1' or '0'
+    new_id = tracker.add_search(name, keywords, location, is_active)
+    return jsonify({"message": "Search created.", "id": new_id})
+
+@app.route('/savedsearches/<int:search_id>', methods=['GET'])
+def get_saved_search(search_id):
+    s = tracker.get_search_by_id(search_id)
+    if not s:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(s)
+
+@app.route('/savedsearches/<int:search_id>', methods=['PUT', 'PATCH'])
+def update_saved_search(search_id):
+    # Use JSON or form data; here we assume form for simplicity
+    name = request.form.get('name')
+    keywords = request.form.get('keywords')
+    location = request.form.get('location')
+    # Convert 'is_active' to bool
+    is_active_str = request.form.get('is_active')
+    is_active = None
+    if is_active_str is not None:
+        is_active = (is_active_str == '1')
+
+    rows_updated = tracker.update_search(search_id, name, keywords, location, is_active)
+    if rows_updated == 0:
+        return jsonify({"message": "No updates applied or search not found."}), 404
+    return jsonify({"message": f"Updated search ID {search_id}."})
+
+@app.route('/savedsearches/<int:search_id>', methods=['DELETE'])
+def delete_saved_search(search_id):
+    rows_deleted = tracker.delete_search(search_id)
+    if rows_deleted == 0:
+        return jsonify({"message": "Not found or already deleted."}), 404
+    return jsonify({"message": f"Deleted search ID {search_id}."})
+
+# Endpoint to run a saved search by ID
+@app.route('/run_search/<int:search_id>', methods=['POST'])
+def run_saved_search(search_id):
+    s = tracker.get_search_by_id(search_id)
+    if not s:
+        return jsonify({"error": "Search not found."}), 404
+
+    # Use the stored keywords/location
+    keywords = s['keywords'] or 'python'
+    location = s['location'] or 'remote'
+    job_search_tester.test_rss_feeds(keywords, location)
+
+    df = job_search_tester.filter_jobs()
+
+    new_count = 0
+    for _, row in df.iterrows():
+        job_dict = row.to_dict()
+        success = tracker.add_job(job_dict)
+        if success:
+            new_count += 1
+
+    return jsonify({
+        'message': f"Ran saved search '{s['name']}' and imported {new_count} new jobs.",
+        'total_fetched': len(df)
+    })
 
 if __name__ == "__main__":
     # Run Flask in debug mode for development
