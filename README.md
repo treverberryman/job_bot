@@ -1,2 +1,2 @@
-# job_bot
-A job search swiss army knife
+# resource-scout
+A data curation swiss army knife
