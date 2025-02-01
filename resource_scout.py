@@ -16,11 +16,11 @@ from datetime import datetime
 import re
 
 app = Flask(__name__)
-DB_NAME = 'jobs.db'
+DB_NAME = 'resources.db'
 
-class JobSearchTester:
+class ResourceSearchTester:
     def __init__(self):
-        self.jobs_df = pd.DataFrame()
+        self.resources_df = pd.DataFrame()
 
     def test_rss_feeds(self, keywords, location, custom_feed=None):
         print(f"Searching for {keywords} in {location}...")
@@ -31,14 +31,10 @@ class JobSearchTester:
         else:
             formatted_keywords = '+'.join(keywords.split())
             rss_feeds = [
-                "https://weworkremotely.com/categories/remote-programming-jobs.rss",
-                "https://remoteok.io/remote-dev-jobs.rss",
-                "https://remotive.com/remote-jobs/feed/qa",
-                "https://jobicy.com/?feed=job_feed&job_categories=technical-support&job_types=full-time&search_region=usa",
-                f"https://rsshub.app/github/job/{formatted_keywords}"
+          
             ]
 
-        jobs = []
+        resources = []
         for feed_url in rss_feeds:
             print(f"\nTrying feed: {feed_url}")
             try:
@@ -48,7 +44,7 @@ class JobSearchTester:
                     description = entry.get('description', '')
                     if not description and 'summary' in entry:
                         description = entry.get('summary', '')
-                    job = {
+                    resource = {
                         'title': entry.get('title', 'No Title'),
                         'company': entry.get('author', 'Unknown'),
                         'url': entry.get('link', ''),
@@ -58,45 +54,45 @@ class JobSearchTester:
                         'location': location,
                         'work_status': 'remote' if 'remote' in location.lower() else 'unknown'
                     }
-                    # Only keep jobs containing any of the keywords
-                    if any(k.lower() in job['title'].lower() or k.lower() in job['description'].lower() for k in keywords.split()):
-                        jobs.append(job)
+                    # Only keep resources containing any of the keywords
+                    if any(k.lower() in resource['title'].lower() or k.lower() in resource['description'].lower() for k in keywords.split()):
+                        resources.append(resource)
             except Exception as e:
                 print(f"Error with feed {feed_url}: {str(e)}")
 
-        self.jobs_df = pd.DataFrame(jobs)
-        if self.jobs_df.empty:
-            self.jobs_df = pd.DataFrame(columns=[
+        self.resources_df = pd.DataFrame(resources)
+        if self.resources_df.empty:
+            self.resources_df = pd.DataFrame(columns=[
                 'title', 'company', 'url', 'description',
                 'date_posted', 'source', 'location', 'work_status'
             ])
-            print("\nNo jobs found matching criteria.")
+            print("\nNo resources found matching criteria.")
         else:
-            print(f"\nTotal jobs found: {len(self.jobs_df)}")
-        return self.jobs_df
+            print(f"\nTotal resources found: {len(self.resources_df)}")
+        return self.resources_df
 
-    def filter_jobs(self, required_skills=None, exclude_keywords=None):
-        if self.jobs_df.empty:
-            print("No jobs to filter - dataframe is empty")
-            return self.jobs_df
-        df = self.jobs_df.copy()
+    def filter_resources(self, required_skills=None, exclude_keywords=None):
+        if self.resources_df.empty:
+            print("No resources to filter - dataframe is empty")
+            return self.resources_df
+        df = self.resources_df.copy()
         if required_skills:
             print(f"\nFiltering for skills: {required_skills}")
-            matching_jobs = []
+            matching_resources = []
             for _, row in df.iterrows():
                 if all(skill.lower() in row['description'].lower() or skill.lower() in row['title'].lower() for skill in required_skills):
-                    matching_jobs.append(row)
-            df = pd.DataFrame(matching_jobs)
-            print(f"Found {len(df)} jobs matching skills")
+                    matching_resources.append(row)
+            df = pd.DataFrame(matching_resources)
+            print(f"Found {len(df)} resources matching skills")
         if exclude_keywords and not df.empty:
             print(f"\nExcluding keywords: {exclude_keywords}")
             pattern = '|'.join(exclude_keywords)
             df = df[~df['title'].str.contains(pattern, case=False, na=False)]
             df = df[~df['description'].str.contains(pattern, case=False, na=False)]
-            print(f"{len(df)} jobs remaining after exclusions")
+            print(f"{len(df)} resources remaining after exclusions")
         return df
 
-class JobTracker:
+class resourceTracker:
     def __init__(self, db_name=DB_NAME):
         self.db_name = db_name
         self.init_db()
@@ -105,7 +101,7 @@ class JobTracker:
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
 
-            c.execute("""CREATE TABLE IF NOT EXISTS jobs (
+            c.execute("""CREATE TABLE IF NOT EXISTS resources (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
                             title TEXT,
                             company TEXT,
@@ -116,12 +112,12 @@ class JobTracker:
                             date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         )""")
 
-            c.execute("PRAGMA table_info(jobs)")
+            c.execute("PRAGMA table_info(resources)")
             existing_cols = [row[1] for row in c.fetchall()]
             if "location" not in existing_cols:
-                c.execute("ALTER TABLE jobs ADD COLUMN location TEXT")
+                c.execute("ALTER TABLE resources ADD COLUMN location TEXT")
             if "work_status" not in existing_cols:
-                c.execute("ALTER TABLE jobs ADD COLUMN work_status TEXT")
+                c.execute("ALTER TABLE resources ADD COLUMN work_status TEXT")
 
             # Create a data_sources table.
             c.execute("""CREATE TABLE IF NOT EXISTS data_sources (
@@ -156,34 +152,34 @@ class JobTracker:
             conn.commit()
 
     # -------------------------------
-    # Jobs
+    # resources
     # -------------------------------
-    def add_job(self, job):
+    def add_resource(self, resource):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute("SELECT * FROM jobs WHERE url = ?", (job['url'],))
+            c.execute("SELECT * FROM resources WHERE url = ?", (resource['url'],))
             existing = c.fetchone()
             if existing:
                 return False
-            c.execute("""INSERT INTO jobs (
+            c.execute("""INSERT INTO resources (
                         title, company, url, description, date_posted,
                         source, location, work_status)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                      (job.get('title',''),
-                       job.get('company',''),
-                       job.get('url',''),
-                       job.get('description',''),
-                       job.get('date_posted',''),
-                       job.get('source',''),
-                       job.get('location',''),
-                       job.get('work_status','')))
+                      (resource.get('title',''),
+                       resource.get('company',''),
+                       resource.get('url',''),
+                       resource.get('description',''),
+                       resource.get('date_posted',''),
+                       resource.get('source',''),
+                       resource.get('location',''),
+                       resource.get('work_status','')))
             conn.commit()
             return True
 
-    def get_jobs(self, search_query=None):
+    def get_resources(self, search_query=None):
         query = """SELECT id, title, company, url, description,
                           date_posted, source, date_added, location, work_status
-                   FROM jobs"""
+                   FROM resources"""
         params = []
         if search_query:
             query += " WHERE title LIKE ? OR company LIKE ?"
@@ -192,9 +188,9 @@ class JobTracker:
             c = conn.cursor()
             c.execute(query, params)
             rows = c.fetchall()
-        jobs_list = []
+        resources_list = []
         for row in rows:
-            jobs_list.append({
+            resources_list.append({
                 'id': row[0],
                 'title': row[1],
                 'company': row[2],
@@ -206,7 +202,7 @@ class JobTracker:
                 'location': row[8],
                 'work_status': row[9],
             })
-        return jobs_list
+        return resources_list
 
     # -------------------------------
     # Data Sources
@@ -356,33 +352,33 @@ class JobTracker:
             conn.commit()
             return c.rowcount
 
-job_search_tester = JobSearchTester()
-tracker = JobTracker()
+resource_search_tester = resourcesearchTester()
+tracker = resourceTracker()
 
 @app.route('/')
 def home():
     return render_template('home.html')
 
 @app.route('/search', methods=['POST'])
-def search_jobs():
+def search_resources():
     keywords = request.form.get('keywords', 'python developer')
     location = request.form.get('location', 'remote')
-    job_search_tester.test_rss_feeds(keywords, location)
-    df = job_search_tester.filter_jobs()
+    resource_search_tester.test_rss_feeds(keywords, location)
+    df = resource_search_tester.filter_resources()
     new_count = 0
     for _, row in df.iterrows():
-        job_dict = row.to_dict()
-        tracker.add_job(job_dict)
+        resource_dict = row.to_dict()
+        tracker.add_resource(resource_dict)
         new_count += 1
     return jsonify({
-        'message': f"Imported {new_count} new jobs.",
+        'message': f"Imported {new_count} new resources.",
         'total_fetched': len(df)
     })
 
-@app.route('/jobs', methods=['GET'])
-def list_jobs():
+@app.route('/resources', methods=['GET'])
+def list_resources():
     query = request.args.get('q')
-    results = tracker.get_jobs(search_query=query)
+    results = tracker.get_resources(search_query=query)
     return jsonify(results)
 
 @app.route('/datasources', methods=['GET', 'POST'])
@@ -444,10 +440,10 @@ def run_saved_search(search_id):
         feed_url = s['data_source_url'] or None
         keywords = s['keywords'] or 'python'
         location = s['location'] or 'remote'
-        job_search_tester.test_rss_feeds(keywords, location, custom_feed=feed_url)
-        df = job_search_tester.filter_jobs()
+        resource_search_tester.test_rss_feeds(keywords, location, custom_feed=feed_url)
+        df = resource_search_tester.filter_resources()
         for _, row in df.iterrows():
-            tracker.add_job(row.to_dict())
+            tracker.add_resource(row.to_dict())
         return redirect(url_for('show_saved_searches'))
     elif s['data_source_type'] and s['data_source_type'].upper() == 'API':
         # Placeholder for future logic: e.g. requests to an external API.
@@ -460,8 +456,8 @@ def list_savedsearches_json():
     searches = tracker.get_searches()
     return jsonify(searches)
 
-@app.route('/api/jobs_for_searches', methods=['POST'])
-def jobs_for_searches():
+@app.route('/api/resources_for_searches', methods=['POST'])
+def resources_for_searches():
     data = request.get_json()
     search_ids = data.get('search_ids', [])
     all_keywords = []
@@ -471,12 +467,12 @@ def jobs_for_searches():
             all_keywords.extend(s['keywords'].split())
     if not all_keywords:
         return jsonify([])
-    all_jobs = tracker.get_jobs()
+    all_resources = tracker.get_resources()
     matched = []
-    for job in all_jobs:
-        text_combo = (job['title'] + ' ' + job['description']).lower()
+    for resource in all_resources:
+        text_combo = (resource['title'] + ' ' + resource['description']).lower()
         if any(k.lower() in text_combo for k in all_keywords):
-            matched.append(job)
+            matched.append(resource)
     return jsonify(matched)
 
 @app.route('/test')

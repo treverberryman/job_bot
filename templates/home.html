@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Job Tracker - Home</title>
+  <title>Resource Tracker - Home</title>
   <script>
     // On page load, fetch saved searches and populate the multi-select.
     document.addEventListener('DOMContentLoaded', async () => {
@@ -33,9 +33,9 @@
       document.getElementById('searchSelect')
         .addEventListener('change', handleSearchSelection);
 
-      // Trigger the fetch of aggregated jobs when user clicks "Show Jobs."
-      document.getElementById('showJobsBtn')
-        .addEventListener('click', handleShowJobs);
+      // Trigger the fetch of aggregated resources when user clicks "Show resources."
+      document.getElementById('showresourcesBtn')
+        .addEventListener('click', handleShowresources);
 
       // Clear table button
       document.getElementById('clearTableBtn')
@@ -69,8 +69,8 @@
       outputEl.textContent = 'Keywords: ' + unique.join(', ');
     }
 
-    async function handleShowJobs() {
-      // Send selected search IDs to /api/jobs_for_searches.
+    async function handleShowresources() {
+      // Send selected search IDs to /api/resources_for_searches.
       const selectEl = document.getElementById('searchSelect');
       const searchIds = [];
       for (let i = 0; i < selectEl.selectedOptions.length; i++) {
@@ -82,48 +82,48 @@
       }
 
       try {
-        const response = await fetch('/api/jobs_for_searches', {
+        const response = await fetch('/api/resources_for_searches', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({search_ids: searchIds})
         });
-        const jobs = await response.json();
-        populateJobsTable(jobs);
+        const resources = await response.json();
+        populateresourcesTable(resources);
       } catch (error) {
-        console.error('Error fetching jobs:', error);
+        console.error('Error fetching resources:', error);
       }
     }
 
-    function populateJobsTable(jobs) {
-      const tableBody = document.getElementById('jobsTableBody');
+    function populateresourcesTable(resources) {
+      const tableBody = document.getElementById('resourcesTableBody');
       // Clear existing rows
       tableBody.innerHTML = '';
 
-      jobs.forEach(job => {
+      resources.forEach(resource => {
         const row = document.createElement('tr');
 
         // We'll just show a few fields
         const tdTitle = document.createElement('td');
-        tdTitle.textContent = job.title;
+        tdTitle.textContent = resource.title;
         row.appendChild(tdTitle);
 
         const tdCompany = document.createElement('td');
-        tdCompany.textContent = job.company;
+        tdCompany.textContent = resource.company;
         row.appendChild(tdCompany);
 
         const tdLocation = document.createElement('td');
-        tdLocation.textContent = job.location || 'N/A';
+        tdLocation.textContent = resource.location || 'N/A';
         row.appendChild(tdLocation);
 
         const tdWorkStatus = document.createElement('td');
-        tdWorkStatus.textContent = job.work_status || 'N/A';
+        tdWorkStatus.textContent = resource.work_status || 'N/A';
         row.appendChild(tdWorkStatus);
 
         const tdLink = document.createElement('td');
         const a = document.createElement('a');
-        a.href = job.url;
+        a.href = resource.url;
         a.target = '_blank';
-        a.textContent = 'View Job';
+        a.textContent = 'View resource';
         tdLink.appendChild(a);
         row.appendChild(tdLink);
 
@@ -132,12 +132,12 @@
     }
 
     function clearTable() {
-      document.getElementById('jobsTableBody').innerHTML = '';
+      document.getElementById('resourcesTableBody').innerHTML = '';
     }
   </script>
 </head>
 <body>
-  <h1>Job Tracker - Home</h1>
+  <h1>resource Tracker - Home</h1>
 
   <h2>Multi-Select Saved Searches</h2>
   <p>
@@ -155,12 +155,12 @@
   </select>
 
   <p id="selectedKeywords">(No keywords selected.)</p>
-  <button id="showJobsBtn">Show Jobs</button>
+  <button id="showresourcesBtn">Show resources</button>
   <button id="clearTableBtn">Clear Table</button>
 
   <hr>
 
-  <h2>Combined Jobs</h2>
+  <h2>Combined Resources</h2>
   <table border="1">
     <thead>
       <tr>
@@ -171,7 +171,7 @@
         <th>Link</th>
       </tr>
     </thead>
-    <tbody id="jobsTableBody">
+    <tbody id="resourcesTableBody">
       <!-- Rows populated dynamically via JS -->
     </tbody>
   </table>

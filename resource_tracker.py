@@ -4,8 +4,8 @@ import hashlib
 from datetime import datetime
 import pandas as pd
 
-class JobDatabase:
-    def __init__(self, db_path="jobs.db"):
+class resourceDatabase:
+    def __init__(self, db_path="resources.db"):
         self.db_path = db_path
         self.init_db()
     
@@ -14,9 +14,9 @@ class JobDatabase:
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
-        # Create jobs table
+        # Create resources table
         c.execute('''
-            CREATE TABLE IF NOT EXISTS jobs (
+            CREATE TABLE IF NOT EXISTS resources (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 company TEXT,
@@ -25,7 +25,7 @@ class JobDatabase:
                 date_posted TEXT,
                 source TEXT,
                 date_added TEXT,
-                job_hash TEXT UNIQUE,
+                resource_hash TEXT UNIQUE,
                 status TEXT DEFAULT 'new',
                 notes TEXT
             )
@@ -34,46 +34,46 @@ class JobDatabase:
         conn.commit()
         conn.close()
     
-    def generate_job_hash(self, job):
-        """Create a unique hash for job deduplication"""
+    def generate_resource_hash(self, resource):
+        """Create a unique hash for resource deduplication"""
         # Combine title and company to create unique identifier
-        unique_string = (f"{job['title'].lower().strip()}"
-                        f"{job['company'].lower().strip()}"
-                        f"{job['description'].lower().strip()}")
+        unique_string = (f"{resource['title'].lower().strip()}"
+                        f"{resource['company'].lower().strip()}"
+                        f"{resource['description'].lower().strip()}")
         return hashlib.md5(unique_string.encode()).hexdigest()
     
-    def add_jobs(self, jobs_df):
-        """Add new jobs to database with deduplication"""
+    def add_resources(self, resources_df):
+        """Add new resources to database with deduplication"""
         conn = sqlite3.connect(self.db_path)
-        new_jobs = 0
+        new_resources = 0
         duplicates = 0
         
-        for _, job in jobs_df.iterrows():
-            job_hash = self.generate_job_hash(job)
+        for _, resource in resources_df.iterrows():
+            resource_hash = self.generate_resource_hash(resource)
             
-            # Check if job already exists
+            # Check if resource already exists
             cursor = conn.cursor()
-            cursor.execute("SELECT id FROM jobs WHERE job_hash = ?", (job_hash,))
+            cursor.execute("SELECT id FROM resources WHERE resource_hash = ?", (resource_hash,))
             exists = cursor.fetchone()
             
             if not exists:
                 try:
                     cursor.execute("""
-                        INSERT INTO jobs (
+                        INSERT INTO resources (
                             title, company, url, description,
-                            date_posted, source, date_added, job_hash
+                            date_posted, source, date_added, resource_hash
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
-                        job['title'],
-                        job['company'],
-                        job['url'],
-                        job['description'],
-                        job['date_posted'],
-                        job['source'],
+                        resource['title'],
+                        resource['company'],
+                        resource['url'],
+                        resource['description'],
+                        resource['date_posted'],
+                        resource['source'],
                         datetime.now().isoformat(),
-                        job_hash
+                        resource_hash
                     ))
-                    new_jobs += 1
+                    new_resources += 1
                 except sqlite3.IntegrityError:
                     duplicates += 1
             else:
@@ -81,49 +81,49 @@ class JobDatabase:
         
         conn.commit()
         conn.close()
-        return new_jobs, duplicates
+        return new_resources, duplicates
     
-    def get_all_jobs(self):
-        """Retrieve all jobs from database"""
+    def get_all_resources(self):
+        """Retrieve all resources from database"""
         conn = sqlite3.connect(self.db_path)
         df = pd.read_sql_query("""
-            SELECT * FROM jobs 
+            SELECT * FROM resources 
             ORDER BY date_added DESC
         """, conn)
         conn.close()
         return df
     
-    def update_job_status(self, job_id, status):
-        """Update job status (new, interested, applied, rejected)"""
+    def update_resource_status(self, resource_id, status):
+        """Update resource status (new, interested, applied, rejected)"""
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
-        c.execute("UPDATE jobs SET status = ? WHERE id = ?", (status, job_id))
+        c.execute("UPDATE resources SET status = ? WHERE id = ?", (status, resource_id))
         conn.commit()
         conn.close()
     
-    def add_job_note(self, job_id, note):
-        """Add a note to a job"""
+    def add_resource_note(self, resource_id, note):
+        """Add a note to a resource"""
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
-        c.execute("UPDATE jobs SET notes = ? WHERE id = ?", (note, job_id))
+        c.execute("UPDATE resources SET notes = ? WHERE id = ?", (note, resource_id))
         conn.commit()
         conn.close()
 
 # Flask web interface
 app = Flask(__name__)
-db = JobDatabase()
+db = resourceDatabase()
 
 @app.route('/')
 def index():
-    return render_template('jobs.html', jobs=db.get_all_jobs().to_dict('records'))
+    return render_template('resources.html', resources=db.get_all_resources().to_dict('records'))
 
-@app.route('/api/jobs')
-def get_jobs():
-    return jsonify(db.get_all_jobs().to_dict('records'))
+@app.route('/api/resources')
+def get_resources():
+    return jsonify(db.get_all_resources().to_dict('records'))
 
-@app.route('/api/jobs/<int:job_id>/status/<status>', methods=['POST'])
-def update_status(job_id, status):
-    db.update_job_status(job_id, status)
+@app.route('/api/resources/<int:resource_id>/status/<status>', methods=['POST'])
+def update_status(resource_id, status):
+    db.update_resource_status(resource_id, status)
     return jsonify({'success': True})
 
 # HTML template for the web interface
@@ -131,45 +131,45 @@ html_template = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Job Tracker</title>
+    <title>resource Tracker</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100">
     <div class="container mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold mb-8">Job Tracker</h1>
+        <h1 class="text-3xl font-bold mb-8">resource Tracker</h1>
         
         <div class="grid grid-cols-1 gap-6">
-            {% for job in jobs %}
+            {% for resource in resources %}
             <div class="bg-white rounded-lg shadow-md p-6">
                 <div class="flex justify-between items-start">
                     <div>
-                        <h2 class="text-xl font-semibold">{{ job.title }}</h2>
-                        <p class="text-gray-600">{{ job.company }}</p>
+                        <h2 class="text-xl font-semibold">{{ resource.title }}</h2>
+                        <p class="text-gray-600">{{ resource.company }}</p>
                     </div>
                     <select 
                         class="status-select border rounded p-2"
-                        data-job-id="{{ job.id }}"
-                        onchange="updateStatus({{ job.id }}, this.value)"
+                        data-resource-id="{{ resource.id }}"
+                        onchange="updateStatus({{ resource.id }}, this.value)"
                     >
-                        <option value="new" {% if job.status == 'new' %}selected{% endif %}>New</option>
-                        <option value="interested" {% if job.status == 'interested' %}selected{% endif %}>Interested</option>
-                        <option value="applied" {% if job.status == 'applied' %}selected{% endif %}>Applied</option>
-                        <option value="rejected" {% if job.status == 'rejected' %}selected{% endif %}>Rejected</option>
+                        <option value="new" {% if resource.status == 'new' %}selected{% endif %}>New</option>
+                        <option value="interested" {% if resource.status == 'interested' %}selected{% endif %}>Interested</option>
+                        <option value="applied" {% if resource.status == 'applied' %}selected{% endif %}>Applied</option>
+                        <option value="rejected" {% if resource.status == 'rejected' %}selected{% endif %}>Rejected</option>
                     </select>
                 </div>
                 
                 <div class="mt-4">
-                    <a href="{{ job.url }}" target="_blank" class="text-blue-500 hover:text-blue-700">View Job Post</a>
-                    <p class="text-sm text-gray-500 mt-2">Posted: {{ job.date_posted }}</p>
-                    <p class="text-sm text-gray-500">Source: {{ job.source }}</p>
+                    <a href="{{ resource.url }}" target="_blank" class="text-blue-500 hover:text-blue-700">View resource Post</a>
+                    <p class="text-sm text-gray-500 mt-2">Posted: {{ resource.date_posted }}</p>
+                    <p class="text-sm text-gray-500">Source: {{ resource.source }}</p>
                 </div>
                 
                 <div class="mt-4">
                     <textarea 
                         class="w-full p-2 border rounded"
                         placeholder="Add notes..."
-                        onchange="updateNotes({{ job.id }}, this.value)"
-                    >{{ job.notes or '' }}</textarea>
+                        onchange="updateNotes({{ resource.id }}, this.value)"
+                    >{{ resource.notes or '' }}</textarea>
                 </div>
             </div>
             {% endfor %}
@@ -177,14 +177,14 @@ html_template = """
     </div>
     
     <script>
-    function updateStatus(jobId, status) {
-        fetch(`/api/jobs/${jobId}/status/${status}`, {
+    function updateStatus(resourceId, status) {
+        fetch(`/api/resources/${resourceId}/status/${status}`, {
             method: 'POST'
         });
     }
     
-    function updateNotes(jobId, notes) {
-        fetch(`/api/jobs/${jobId}/notes`, {
+    function updateNotes(resourceId, notes) {
+        fetch(`/api/resources/${resourceId}/notes`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -198,31 +198,31 @@ html_template = """
 """
 
 # Save the template
-with open('templates/jobs.html', 'w') as f:
+with open('templates/resources.html', 'w') as f:
     f.write(html_template)
 
-# Modified JobSearchTester to use database
-class JobSearchTester:
+# Modified resourcesearchTester to use database
+class resourcesearchTester:
     def __init__(self):
-        self.jobs_df = pd.DataFrame()
-        self.db = JobDatabase()
+        self.resources_df = pd.DataFrame()
+        self.db = resourceDatabase()
     
-    # ... (previous JobSearchTester code remains the same)
+    # ... (previous resourcesearchTester code remains the same)
     
     def save_to_db(self):
-        """Save found jobs to database"""
-        if not self.jobs_df.empty:
-            new_jobs, duplicates = self.db.add_jobs(self.jobs_df)
+        """Save found resources to database"""
+        if not self.resources_df.empty:
+            new_resources, duplicates = self.db.add_resources(self.resources_df)
             print(f"\nSaved to database:")
-            print(f"New jobs added: {new_jobs}")
-            print(f"Duplicate jobs skipped: {duplicates}")
+            print(f"New resources added: {new_resources}")
+            print(f"Duplicate resources skipped: {duplicates}")
 
 if __name__ == "__main__":
     # Create database and start web interface
-    db = JobDatabase()
+    db = resourceDatabase()
     
-    # Run job search
-    tester = JobSearchTester()
+    # Run resource search
+    tester = resourcesearchTester()
     tester.test_rss_feeds(keywords="python developer", location="remote")
     tester.save_to_db()
     
